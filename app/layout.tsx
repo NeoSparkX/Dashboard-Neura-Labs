@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Neura Labs | Dashboard",
+  title: "Neosparkx | Dashboard",
   description: "Internal Agency Operating System",
 };
 

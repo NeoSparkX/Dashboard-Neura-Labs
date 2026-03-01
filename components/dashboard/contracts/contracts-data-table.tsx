@@ -50,14 +50,14 @@ function buildGmailUrl(contract: Contract, shareUrl: string) {
   const subject = encodeURIComponent(contract.title);
   const body = encodeURIComponent(
     `Hi ${contract.client_name || "there"},\n\n` +
-      `Please find the agreement "${contract.title}" ready for your review.\n\n` +
-      `You can view and download the document using the link below:\n` +
-      `${shareUrl}\n\n` +
-      `If you have any questions or require changes, feel free to reply to this email.\n\n` +
-      `Best regards` +
-      `Neura Labs Agency` +
-      `Intelligence in Design` +
-      `🌐: neuralabsagency.vercel.app`
+    `Please find the agreement "${contract.title}" ready for your review.\n\n` +
+    `You can view and download the document using the link below:\n` +
+    `${shareUrl}\n\n` +
+    `If you have any questions or require changes, feel free to reply to this email.\n\n` +
+    `Best regards` +
+    `Neosparkx Agency` +
+    `Intelligence in Design` +
+    `🌐: neuralabsagency.vercel.app`
   );
   const to = contract.client_email
     ? encodeURIComponent(contract.client_email)

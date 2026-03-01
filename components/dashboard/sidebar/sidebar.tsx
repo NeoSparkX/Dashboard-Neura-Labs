@@ -74,8 +74,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           className="flex items-center gap-2 font-semibold text-lg hover:opacity-90 transition-opacity"
           onClick={onNavigate}
         >
-          <Image src="/logo-small.jpg" alt="Neura Labs Logo" width={24} height={24} className="rounded-md object-cover" />
-          <span>Neura Labs</span>
+          <Image src="/logo-small.jpg" alt="Neosparkx Logo" width={24} height={24} className="rounded-md object-cover" />
+          <span>Neosparkx</span>
         </Link>
       </div>
 

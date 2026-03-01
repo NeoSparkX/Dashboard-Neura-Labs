@@ -103,7 +103,7 @@ const InvoiceDocument = ({ invoice }: { invoice: Invoice }) => {
         <View style={styles.header}>
           <View>
             <View style={styles.logoPlaceholder} />
-            <Text style={{ marginTop: 10, fontSize: 14, fontWeight: "bold" }}>Neura Labs</Text>
+            <Text style={{ marginTop: 10, fontSize: 14, fontWeight: "bold" }}>Neosparkx</Text>
             <Text style={{ fontSize: 10, color: "#737373", marginTop: 4 }}>123 Innovation Drive</Text>
             <Text style={{ fontSize: 10, color: "#737373" }}>Tech City, TX 78701</Text>
           </View>
@@ -136,7 +136,7 @@ const InvoiceDocument = ({ invoice }: { invoice: Invoice }) => {
             <View style={styles.tableCol}><Text style={styles.label}>Description</Text></View>
             <View style={styles.tableColRight}><Text style={styles.label}>Amount</Text></View>
           </View>
-          
+
           <View style={styles.tableRow}>
             <View style={styles.tableCol}><Text style={{ fontSize: 12 }}>Standard Service Provision</Text></View>
             <View style={styles.tableColRight}><Text style={{ fontSize: 12 }}>{formattedAmount}</Text></View>
@@ -145,12 +145,12 @@ const InvoiceDocument = ({ invoice }: { invoice: Invoice }) => {
 
         <View style={styles.footer}>
           <View>
-             <Text style={styles.label}>Payment Terms</Text>
-             <Text style={{ fontSize: 10, marginTop: 4 }}>Please pay within 15 days of receiving this invoice.</Text>
+            <Text style={styles.label}>Payment Terms</Text>
+            <Text style={{ fontSize: 10, marginTop: 4 }}>Please pay within 15 days of receiving this invoice.</Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
-             <Text style={styles.label}>Total Due</Text>
-             <Text style={styles.totalText}>{formattedAmount}</Text>
+            <Text style={styles.label}>Total Due</Text>
+            <Text style={styles.totalText}>{formattedAmount}</Text>
           </View>
         </View>
       </Page>

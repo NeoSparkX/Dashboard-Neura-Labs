@@ -86,7 +86,7 @@ export default function SharedContractPage() {
                 {contract.title}
               </h1>
               <p className="text-xs text-muted-foreground">
-                Shared by Neura Labs
+                Shared by Neosparkx
               </p>
             </div>
           </div>
@@ -130,7 +130,7 @@ export default function SharedContractPage() {
         {/* Footer info */}
         <div className="mt-6 text-center">
           <p className="text-xs text-muted-foreground">
-            This document was shared securely via Neura Labs Dashboard. Contact
+            This document was shared securely via Neosparkx Dashboard. Contact
             the sender if you have questions.
           </p>
         </div>

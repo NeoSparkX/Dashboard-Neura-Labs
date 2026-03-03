@@ -110,7 +110,7 @@ export function Topbar() {
           {/* Search trigger — full bar on sm+, icon-only below sm */}
           <Button
             variant="outline"
-            className="hidden w-64 justify-between border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground sm:flex rounded-full"
+            className="hidden w-64 justify-between border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground md:flex rounded-full"
             onClick={() => setCommandOpen(true)}
           >
             <span className="flex items-center gap-2">
@@ -124,34 +124,17 @@ export function Topbar() {
           <Button
             size="icon"
             variant="ghost"
-            className="h-9 w-9 text-muted-foreground hover:text-foreground sm:hidden"
+            className="h-9 w-9 text-muted-foreground hover:text-foreground md:hidden"
             onClick={() => setCommandOpen(true)}
           >
             <Search className="h-5 w-5" />
           </Button>
 
-          {/* Quick Create */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground hover:text-foreground">
-                <Plus className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-card border-border text-foreground">
-              <DropdownMenuLabel className="text-muted-foreground">Create New</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer hover:bg-accent focus:bg-accent" onClick={() => router.push("/dashboard/clients")}>Client</DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer hover:bg-accent focus:bg-accent" onClick={() => router.push("/dashboard/projects")}>Project</DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer hover:bg-accent focus:bg-accent" onClick={() => router.push("/dashboard/meetings")}>Meeting</DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer hover:bg-accent focus:bg-accent" onClick={() => router.push("/dashboard/invoices")}>Invoice</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Tasks */}
+          {/* Tasks - hidden on small screens */}
           <Button
             size="icon"
             variant="ghost"
-            className="h-9 w-9 text-muted-foreground hover:text-foreground relative"
+            className="hidden sm:flex h-9 w-9 text-muted-foreground hover:text-foreground relative"
             onClick={() => {
               void refreshTasksCount();
               setTasksOpen(true);
@@ -179,11 +162,11 @@ export function Topbar() {
             </Link>
           </Button>
 
-          {/* Theme Toggle */}
-          <ThemeToggle />
-
-          {/* Notifications */}
-          <NotificationsPanel />
+          {/* Theme Toggle & Notifications - hidden on small screens */}
+          <div className="hidden sm:flex items-center gap-1 sm:gap-2">
+            <ThemeToggle />
+            <NotificationsPanel />
+          </div>
 
           {/* User Profile */}
           <DropdownMenu>

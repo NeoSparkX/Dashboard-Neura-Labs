@@ -14,6 +14,8 @@ import {
   PieChart,
   ScrollText,
   Briefcase,
+  Plug,
+  Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
@@ -21,6 +23,8 @@ import {
   Sheet,
   SheetContent,
 } from "@/components/ui/sheet";
+import { ThemeToggle } from "@/components/dashboard/topbar/theme-toggle";
+import { NotificationsPanel } from "@/components/dashboard/topbar/notifications-panel";
 
 type NavItem = {
   name: string;
@@ -131,6 +135,22 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             </div>
           ))}
         </nav>
+      </div>
+
+      {/* Mobile-only bottom actions */}
+      <div className="sm:hidden mt-auto border-t border-border p-4 flex items-center justify-between shrink-0">
+        <Link href="/dashboard/integrations" onClick={onNavigate} className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors">
+          <Plug className="h-5 w-5" />
+        </Link>
+        <Link href="/dashboard/settings" onClick={onNavigate} className="p-2 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors">
+          <Settings className="h-5 w-5" />
+        </Link>
+        <div className="scale-90 origin-left">
+          <ThemeToggle />
+        </div>
+        <div className="scale-90 origin-right">
+          <NotificationsPanel />
+        </div>
       </div>
     </>
   );

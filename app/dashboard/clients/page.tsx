@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ClientsSplitView } from "@/components/dashboard/clients/client-split-view";
 
+export const dynamic = "force-dynamic";
+
 export default async function ClientsPage() {
   const supabase = createAdminClient();
   const { data: clients, error } = await supabase

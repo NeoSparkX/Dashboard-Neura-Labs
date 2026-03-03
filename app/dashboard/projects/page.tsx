@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ProjectViewSwitcher } from "@/components/dashboard/projects/project-view-switcher";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProjectsPage() {
   const supabase = createAdminClient();
   const { data: projects, error } = await supabase

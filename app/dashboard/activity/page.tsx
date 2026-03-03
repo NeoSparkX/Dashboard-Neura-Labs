@@ -2,6 +2,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ActivityTimeline, ActivityLog } from "@/components/dashboard/activity/activity-timeline";
 import { Clock } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function ActivityPage() {
   const supabase = createAdminClient();
 

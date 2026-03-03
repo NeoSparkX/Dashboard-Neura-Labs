@@ -2,6 +2,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { MeetingsDataTable } from "@/components/dashboard/meetings/meetings-data-table";
 import { columns, Meeting } from "@/components/dashboard/meetings/meetings-columns";
 
+export const dynamic = "force-dynamic";
+
 export default async function MeetingsPage() {
   const supabase = createAdminClient();
   const { data, error } = await supabase

@@ -2,6 +2,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { InvoicesDataTable } from "@/components/dashboard/invoices/invoices-data-table";
 import { columns, Invoice } from "@/components/dashboard/invoices/invoices-columns";
 
+export const dynamic = "force-dynamic";
+
 export default async function InvoicesPage() {
   const supabase = createAdminClient();
 

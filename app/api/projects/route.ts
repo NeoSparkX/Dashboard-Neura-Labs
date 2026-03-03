@@ -231,24 +231,69 @@ export async function DELETE(req: Request) {
     if (!id) return NextResponse.json({ error: "Project id is required" }, { status: 400 });
 
     const supabase = createAdminClient();
-    const { data, error } = await supabase
+
+    // Get project name before deletion for activity log
+    const { data: proj, error: fetchError } = await supabase
         .from("projects")
-        .delete()
-        .eq("id", id)
         .select("id,project_name")
+        .eq("id", id)
         .single();
 
-    if (error) {
-        console.error("Failed to delete project:", error.message);
-        return NextResponse.json({ error: "Failed to delete project" }, { status: 500 });
+    if (fetchError || !proj) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    // CASCADE: Get all work item IDs for this project
+    const { data: workItems } = await supabase
+        .from("project_work_items")
+        .select("id")
+        .eq("project_id", id);
+
+    const wiIds = (workItems ?? []).map((wi: { id: string }) => wi.id);
+
+    if (wiIds.length > 0) {
+        // Delete status logs for these work items
+        await supabase
+            .from("work_item_status_log")
+            .delete()
+            .in("work_item_id", wiIds);
+
+        // Delete assignments for these work items
+        await supabase
+            .from("work_item_assignments")
+            .delete()
+            .in("work_item_id", wiIds);
+
+        // Delete the work items themselves
+        await supabase
+            .from("project_work_items")
+            .delete()
+            .eq("project_id", id);
+    }
+
+    // Delete tasks linked to this project
+    await supabase
+        .from("tasks")
+        .delete()
+        .eq("project_id", id);
+
+    // Now delete the project
+    const { error: deleteError } = await supabase
+        .from("projects")
+        .delete()
+        .eq("id", id);
+
+    if (deleteError) {
+        console.error("Failed to delete project:", deleteError.message);
+        return NextResponse.json({ error: `Failed to delete project: ${deleteError.message}` }, { status: 500 });
     }
 
     await logActivity({
         userId,
         action: "Deleted",
         entityType: "project",
-        entityId: data.id,
-        details: { target_name: data.project_name },
+        entityId: proj.id,
+        details: { target_name: proj.project_name },
     });
 
     return NextResponse.json({ success: true });

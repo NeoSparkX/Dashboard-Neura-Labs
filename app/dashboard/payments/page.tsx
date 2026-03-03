@@ -2,6 +2,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { PaymentsDataTable } from "@/components/dashboard/payments/payments-data-table";
 import { columns, Payment } from "@/components/dashboard/payments/payments-columns";
 
+export const dynamic = "force-dynamic";
+
 export default async function PaymentsPage() {
   const supabase = createAdminClient();
 
@@ -30,7 +32,7 @@ export default async function PaymentsPage() {
     .filter((p: any) => p.payment_date >= thirtyDaysAgo)
     .reduce((sum: number, p: any) => sum + Number(p.amount), 0);
 
-  // Outstanding balance: sum of pending/overdue/partial/draft invoice amounts minus total payments received
+  // Outstanding balance: sum of pending/overdue/partial invoice amounts
   const { data: openInvoices } = await supabase
     .from("invoices")
     .select("amount")

@@ -2,6 +2,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { AgreementsDataTable } from "@/components/dashboard/agreements/agreements-data-table";
 import { columns, Agreement } from "@/components/dashboard/agreements/agreements-columns";
 
+export const dynamic = "force-dynamic";
+
 export default async function AgreementsPage() {
   const supabase = createAdminClient();
 

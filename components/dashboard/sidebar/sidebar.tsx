@@ -112,7 +112,7 @@ export function Sidebar() {
 
   return (
     <TooltipProvider>
-      <div className="hidden lg:flex flex-col items-center justify-center h-full w-[52px] shrink-0 py-4 pl-2">
+      <div className="hidden lg:flex flex-col items-center justify-center h-full w-[60px] shrink-0 py-4 pl-3">
         {/* Floating pill container — vertically centered */}
         <div className="flex flex-col items-center gap-0.5 bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl py-2 px-1.5 shadow-sm">
           {/* Overview */}

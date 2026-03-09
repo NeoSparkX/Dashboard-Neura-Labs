@@ -27,6 +27,12 @@ import {
 import { ThemeToggle } from "@/components/dashboard/topbar/theme-toggle";
 import { NotificationsPanel } from "@/components/dashboard/topbar/notifications-panel";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type NavItem = {
   name: string;
@@ -70,8 +76,74 @@ const navigationGroups: NavGroup[] = [
   },
 ];
 
-/** Shared navigation content used by both inline sidebar and mobile drawer */
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+/* ------------------------------------------------------------------ */
+/*  Icon rail item with tooltip                                       */
+/* ------------------------------------------------------------------ */
+
+function IconRailItem({ item, isActive }: { item: NavItem; isActive: boolean }) {
+  return (
+    <Tooltip delayDuration={0}>
+      <TooltipTrigger asChild>
+        <Link
+          href={item.href}
+          className={cn(
+            "flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200",
+            isActive
+              ? "bg-primary/15 text-primary shadow-sm"
+              : "text-muted-foreground hover:bg-accent hover:text-foreground"
+          )}
+        >
+          <item.icon className="h-4 w-4" />
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="right" sideOffset={12} className="text-xs font-medium">
+        {item.name}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Desktop: Floating icon-only sidebar                               */
+/* ------------------------------------------------------------------ */
+
+export function Sidebar() {
+  const pathname = usePathname();
+
+  return (
+    <TooltipProvider>
+      <div className="hidden lg:flex flex-col items-center justify-center h-full w-[52px] shrink-0 py-4 pl-2">
+        {/* Floating pill container — vertically centered */}
+        <div className="flex flex-col items-center gap-0.5 bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl py-2 px-1.5 shadow-sm">
+          {/* Overview */}
+          <IconRailItem
+            item={overviewItem}
+            isActive={pathname === overviewItem.href}
+          />
+
+          {/* All nav groups */}
+          {navigationGroups.map((group) => (
+            <div key={group.name} className="w-full flex flex-col items-center gap-0.5">
+              <div className="w-5 h-px bg-border/40 my-0.5" />
+              {group.items.map((item) => {
+                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                return (
+                  <IconRailItem key={item.name} item={item} isActive={isActive} />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </TooltipProvider>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Mobile: Full drawer sidebar                                       */
+/* ------------------------------------------------------------------ */
+
+function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
@@ -158,16 +230,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-/** Desktop inline sidebar — hidden below lg breakpoint */
-export function Sidebar() {
-  return (
-    <div className="hidden lg:flex h-full w-[260px] flex-col border-r border-border bg-background shrink-0">
-      <SidebarContent />
-    </div>
-  );
-}
-
-/** Mobile sidebar drawer — visible below lg breakpoint */
 export function MobileSidebar() {
   const { mobileOpen, setMobileOpen } = useSidebar();
 
@@ -181,7 +243,7 @@ export function MobileSidebar() {
         <VisuallyHidden>
           <SheetTitle>Navigation Menu</SheetTitle>
         </VisuallyHidden>
-        <SidebarContent onNavigate={() => setMobileOpen(false)} />
+        <MobileSidebarContent onNavigate={() => setMobileOpen(false)} />
       </SheetContent>
     </Sheet>
   );

@@ -18,13 +18,14 @@ export async function POST(req: Request) {
 
   const file = formData.get("file") as File | null;
   const forceBucket = formData.get("bucket") as string | null;
+  const forcePath = formData.get("path") as string | null;
 
   if (!file || file.size === 0)
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
   const folder = forceBucket ?? getFolder(file.type);
   const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-  const path = `uploads/${safeName}`;
+  const path = forcePath ?? `uploads/${safeName}`;
 
   const buffer = Buffer.from(await file.arrayBuffer());
 

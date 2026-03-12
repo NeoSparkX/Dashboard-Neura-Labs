@@ -25,6 +25,10 @@ export type Invoice = {
   issue_date: string;
   due_date: string;
   status: "Draft" | "Pending" | "Paid" | "Overdue" | "Partial";
+  pdf_url?: string | null;
+  client_email?: string;
+  client_phone?: string;
+  client_address?: string;
 };
 
 export const columns: ColumnDef<Invoice>[] = [
@@ -44,8 +48,8 @@ export const columns: ColumnDef<Invoice>[] = [
     },
     cell: ({ row }) => (
       <div className="font-medium cursor-pointer hover:text-primary transition-colors flex items-center gap-2">
-         <FileText className="h-4 w-4 text-muted-foreground" />
-         {row.getValue("invoice_number")}
+        <FileText className="h-4 w-4 text-muted-foreground" />
+        {row.getValue("invoice_number")}
       </div>
     ),
   },
@@ -63,7 +67,7 @@ export const columns: ColumnDef<Invoice>[] = [
         style: "currency",
         currency: "USD",
       }).format(amount);
- 
+
       return <div className="font-medium">{formatted}</div>;
     },
   },
@@ -94,21 +98,21 @@ export const columns: ColumnDef<Invoice>[] = [
     accessorKey: "issue_date",
     header: "Issued",
     cell: ({ row }) => {
-       const date = new Date(row.getValue("issue_date"));
-       return <div className="text-muted-foreground">{format(date, "MMM d, yyyy")}</div>;
+      const date = new Date(row.getValue("issue_date"));
+      return <div className="text-muted-foreground">{format(date, "MMM d, yyyy")}</div>;
     },
   },
   {
     accessorKey: "due_date",
     header: "Due Date",
     cell: ({ row }) => {
-       const date = new Date(row.getValue("due_date"));
-       const isOverdue = row.original.status === "Overdue";
-       return (
-          <div className={`text-sm ${isOverdue ? "text-[#ef4444] font-medium" : "text-muted-foreground"}`}>
-             {format(date, "MMM d, yyyy")}
-          </div>
-       );
+      const date = new Date(row.getValue("due_date"));
+      const isOverdue = row.original.status === "Overdue";
+      return (
+        <div className={`text-sm ${isOverdue ? "text-[#ef4444] font-medium" : "text-muted-foreground"}`}>
+          {format(date, "MMM d, yyyy")}
+        </div>
+      );
     },
   },
   {
@@ -134,7 +138,19 @@ export const columns: ColumnDef<Invoice>[] = [
             </DropdownMenuItem>
             <DropdownMenuItem className="cursor-pointer hover:bg-accent focus:bg-accent p-0" asChild>
               <div className="px-2 py-1.5 hover:bg-accent">
-                <InvoicePdfDownload invoice={invoice} />
+                <DropdownMenuItem className="cursor-pointer hover:bg-accent focus:bg-accent p-0" asChild>
+                  <div className="px-2 py-1.5 hover:bg-accent">
+                    <InvoicePdfDownload invoice={invoice} />
+                  </div>
+                </DropdownMenuItem>
+                {invoice.pdf_url && (
+                  <DropdownMenuItem
+                    className="cursor-pointer hover:bg-accent focus:bg-accent"
+                    onClick={() => window.open(invoice.pdf_url!, "_blank")}
+                  >
+                    <Download className="h-4 w-4 mr-2" /> View Stored File
+                  </DropdownMenuItem>
+                )}
               </div>
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-accent" />

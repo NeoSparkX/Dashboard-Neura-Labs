@@ -9,7 +9,6 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,12 +16,22 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Search, Plus, Loader2, FileText, MoreHorizontal } from "lucide-react";
-import { format } from "date-fns";
+import { pdf } from "@react-pdf/renderer";
 import { Invoice } from "./invoices-columns";
 import { getEffectiveInvoiceStatus, type InvoiceSnapshot } from "@/lib/invoices/metrics";
+import { InvoiceDocument } from "./invoice-pdf";
+import { InvoiceSuccess } from "./invoice-success";
+
+interface GeneratedInvoice {
+  invoiceNumber: string;
+  clientName: string;
+  amount: number;
+  pdfUrl: string | null;
+  clientEmail: string | null;
+}
 
 /* ─── helpers ─── */
-type Client = { id: string; company_name: string };
+type Client = { id: string; company_name: string; email?: string; phone?: string; country?: string };
 type ProjectOption = { id: string; project_name: string };
 
 const today = () => new Date().toISOString().split("T")[0];
@@ -40,11 +49,11 @@ const EMPTY_PAY = {
 
 /* ─── standalone form components (outside to avoid remount) ─── */
 function InvoiceForm({
-  form, onChange, error, saving, clients, projects, onSave, onCancel,
+  form, onChange, error, saving, isGeneratingPdf, clients, projects, onSave, onCancel,
 }: {
   form: typeof EMPTY_INV;
   onChange: (k: keyof typeof EMPTY_INV, v: string) => void;
-  error: string | null; saving: boolean;
+  error: string | null; saving: boolean; isGeneratingPdf: boolean;
   clients: Client[]; projects: ProjectOption[];
   onSave: () => void; onCancel: () => void;
 }) {
@@ -105,8 +114,8 @@ function InvoiceForm({
       </div>
       <div className="flex justify-end gap-2 pt-1">
         <Button size="sm" variant="ghost" disabled={saving} onClick={onCancel} className="text-muted-foreground">Cancel</Button>
-        <Button size="sm" disabled={saving} onClick={onSave} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-          {saving && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />} Create Invoice
+        <Button size="sm" disabled={saving || isGeneratingPdf} onClick={onSave} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+          {(saving || isGeneratingPdf) && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />} {isGeneratingPdf ? "Generating PDF..." : "Create Invoice"}
         </Button>
       </div>
     </div>
@@ -173,13 +182,15 @@ export function InvoicesDataTable({ columns, data: initialData }: InvoicesDataTa
   const [payForm, setPayForm] = useState(EMPTY_PAY);
   const [invError, setInvError] = useState<string | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [isPending, startTransition] = useTransition();
+  const [generatedInvoice, setGeneratedInvoice] = useState<GeneratedInvoice | null>(null);
 
   useEffect(() => {
-    fetch("/api/clients").then((r) => r.json()).then((p) => setClients(p?.clients ?? [])).catch(() => {});
-    fetch("/api/projects").then((r) => r.json()).then((p) => setProjects(p?.projects ?? [])).catch(() => {});
+    fetch("/api/clients").then((r) => r.json()).then((p) => setClients(p?.clients ?? [])).catch(() => { });
+    fetch("/api/projects").then((r) => r.json()).then((p) => setProjects(p?.projects ?? [])).catch(() => { });
   }, []);
 
   function setInvField(k: keyof typeof EMPTY_INV, v: string) { setInvForm((p) => ({ ...p, [k]: v })); }
@@ -201,6 +212,61 @@ export function InvoicesDataTable({ columns, data: initialData }: InvoicesDataTa
       if (!res.ok) { setInvError(payload?.error ?? "Failed to create invoice"); return; }
       const inv = payload.invoice;
       const clientName = clients.find((c) => c.id === inv.client_id)?.company_name ?? "Unknown";
+
+      setIsGeneratingPdf(true);
+      try {
+        const client = clients.find((c) => c.id === inv.client_id);
+        const invWithInfo = {
+          ...inv,
+          client_name: clientName,
+          client_email: client?.email,
+          client_phone: client?.phone,
+          client_address: client?.country
+        };
+        const blob = await pdf(<InvoiceDocument invoice={invWithInfo} />).toBlob();
+        const fd = new FormData();
+        fd.append("file", new File([blob], `invoice-${inv.invoice_number}.pdf`, { type: "application/pdf" }));
+        fd.append("bucket", "invoices");
+        fd.append("path", `invoice-${inv.invoice_number}.pdf`);
+
+        const uploadRes = await fetch("/api/upload", { method: "POST", body: fd });
+        if (uploadRes.ok) {
+          const { url: pdfUrl } = await uploadRes.json();
+          await fetch("/api/invoices", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: inv.id, pdf_url: pdfUrl }),
+          });
+          await fetch("/api/files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              file_name: `invoice-${inv.invoice_number}.pdf`,
+              file_url: pdfUrl,
+              file_type: "application/pdf",
+              file_size: blob.size,
+              client_name: clientName,
+              description: `Generated Invoice #${inv.invoice_number}`,
+            }),
+          });
+          inv.pdf_url = pdfUrl;
+        }
+
+        setGeneratedInvoice({
+          invoiceNumber: inv.invoice_number,
+          clientName: clientName,
+          amount: inv.amount,
+          pdfUrl: inv.pdf_url,
+          clientEmail: client?.email ?? null,
+        });
+        setShowCreateForm(false);
+        setInvForm(EMPTY_INV);
+      } catch (err) {
+        console.error("PDF automation error:", err);
+      } finally {
+        setIsGeneratingPdf(false);
+      }
+
       setInvoices((prev) => [{ ...inv, client_name: clientName }, ...prev]);
       setInvForm(EMPTY_INV);
       setShowCreateForm(false);
@@ -250,18 +316,18 @@ export function InvoicesDataTable({ columns, data: initialData }: InvoicesDataTa
           prev.map((inv) =>
             inv.id === id
               ? {
-                  ...inv,
-                  status: getEffectiveInvoiceStatus(
-                    {
-                      id: inv.id,
-                      amount: inv.amount,
-                      status,
-                      due_date: inv.due_date,
-                      issue_date: inv.issue_date,
-                    } satisfies InvoiceSnapshot,
-                    new Date()
-                  ),
-                }
+                ...inv,
+                status: getEffectiveInvoiceStatus(
+                  {
+                    id: inv.id,
+                    amount: inv.amount,
+                    status,
+                    due_date: inv.due_date,
+                    issue_date: inv.issue_date,
+                  } satisfies InvoiceSnapshot,
+                  new Date()
+                ),
+              }
               : inv
           )
         );
@@ -316,6 +382,12 @@ export function InvoicesDataTable({ columns, data: initialData }: InvoicesDataTa
 
   const allColumns = [...columns.filter((c) => c.id !== "actions"), actionColumn];
 
+  const handleCancelCreate = () => {
+    setShowCreateForm(false);
+    setInvError(null);
+    setInvForm(EMPTY_INV);
+  };
+
   const table = useReactTable({
     data: invoices,
     columns: allColumns,
@@ -330,98 +402,168 @@ export function InvoicesDataTable({ columns, data: initialData }: InvoicesDataTa
   });
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">Invoices</h2>
-          <p className="text-sm text-muted-foreground">Manage and track your billing.</p>
-        </div>
-        <Button onClick={() => { setShowCreateForm(true); setInvError(null); setInvForm(EMPTY_INV); }} className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
-          <Plus className="h-4 w-4 mr-1" /> Create Invoice
-        </Button>
-      </div>
-
-      {/* Create Invoice form */}
-      {showCreateForm && (
-        <div className="rounded-xl border border-border bg-card p-5 overflow-y-auto max-h-[calc(100vh-160px)]">
-          <h3 className="text-sm font-semibold text-foreground mb-4">New Invoice</h3>
-          <InvoiceForm form={invForm} onChange={setInvField} error={invError} saving={isPending} clients={clients} projects={projects} onSave={handleCreate} onCancel={() => setShowCreateForm(false)} />
-        </div>
-      )}
-
-      {/* Record Payment inline panel */}
-      {payingInvoice && (
-        <div className="rounded-xl border border-[#22c55e]/30 bg-card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-foreground">
-              Record Payment — <span className="text-primary">{payingInvoice.invoice_number}</span>
-              <span className="ml-2 text-xs text-muted-foreground">({new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(payingInvoice.amount)} total)</span>
-            </h3>
-            <Button variant="ghost" size="sm" onClick={() => setPayingInvoice(null)} className="text-muted-foreground hover:text-foreground h-7 px-2">✕</Button>
-          </div>
-          <PaymentForm form={payForm} onChange={setPayField} error={payError} saving={isPending} onSave={handleRecordPayment} onCancel={() => setPayingInvoice(null)} />
-        </div>
-      )}
-
-      {/* Search */}
-      <div className="flex items-center space-x-2 bg-card border border-border rounded-md px-3 py-2 w-full max-w-sm">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <input
-          placeholder="Search invoices..."
-          value={(table.getColumn("invoice_number")?.getFilterValue() as string) ?? ""}
-          onChange={(e) => table.getColumn("invoice_number")?.setFilterValue(e.target.value)}
-          className="w-full bg-transparent border-0 outline-none text-sm placeholder:text-muted-foreground text-foreground"
+    <div className="space-y-6">
+      {generatedInvoice ? (
+        <InvoiceSuccess
+          invoiceNumber={generatedInvoice.invoiceNumber}
+          clientName={generatedInvoice.clientName}
+          amount={generatedInvoice.amount}
+          pdfUrl={generatedInvoice.pdfUrl}
+          clientEmail={generatedInvoice.clientEmail}
+          onNewInvoice={() => {
+            setGeneratedInvoice(null);
+            setShowCreateForm(true);
+          }}
+          onBackToList={() => setGeneratedInvoice(null)}
         />
-      </div>
+      ) : (
+        <>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center space-x-2 bg-card border border-border rounded-md px-3 py-2 w-full max-w-sm">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <input
+                placeholder="Search by invoice or client..."
+                value={(table.getColumn("client_name")?.getFilterValue() as string) ?? ""}
+                onChange={(e) => table.getColumn("client_name")?.setFilterValue(e.target.value)}
+                className="w-full bg-transparent border-0 outline-none text-sm placeholder:text-muted-foreground text-foreground"
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                setShowCreateForm((prev) => !prev);
+                setInvError(null);
+              }}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              {showCreateForm ? "Close Form" : "Create Invoice"}
+            </Button>
+          </div>
 
-      {/* Table */}
-      <div className="rounded-xl border border-border bg-card overflow-x-auto">
-        <Table>
-          <TableHeader className="bg-accent border-b border-border">
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id} className="border-b border-border hover:bg-transparent">
-                {hg.headers.map((h) => (
-                  <TableHead key={h.id} className="text-muted-foreground font-medium h-10">
-                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
-                  </TableHead>
+          {showCreateForm && (
+            <div className="rounded-xl border border-border bg-card p-4">
+              <InvoiceForm
+                form={invForm}
+                onChange={setInvField}
+                error={invError}
+                saving={isPending}
+                isGeneratingPdf={isGeneratingPdf}
+                clients={clients}
+                projects={projects}
+                onSave={handleCreate}
+                onCancel={handleCancelCreate}
+              />
+            </div>
+          )}
+
+          {payingInvoice && (
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">Record Payment</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {payingInvoice.invoice_number} for {payingInvoice.client_name}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setPayingInvoice(null);
+                    setPayError(null);
+                    setPayForm(EMPTY_PAY);
+                  }}
+                  className="text-muted-foreground"
+                >
+                  Cancel
+                </Button>
+              </div>
+              <PaymentForm
+                form={payForm}
+                onChange={setPayField}
+                error={payError}
+                saving={isPending}
+                onSave={handleRecordPayment}
+                onCancel={() => {
+                  setPayingInvoice(null);
+                  setPayError(null);
+                  setPayForm(EMPTY_PAY);
+                }}
+              />
+            </div>
+          )}
+
+          <div className="rounded-xl border border-border bg-card overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-accent border-b border-border">
+                {table.getHeaderGroups().map((hg) => (
+                  <TableRow key={hg.id} className="border-b border-border hover:bg-transparent">
+                    {hg.headers.map((h) => (
+                      <TableHead key={h.id} className="text-muted-foreground font-medium h-10">
+                        {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
+                      </TableHead>
+                    ))}
+                  </TableRow>
                 ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className="border-b border-border hover:bg-accent/50">
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-3">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows?.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <TableRow key={row.id} className="border-b border-border hover:bg-accent/50">
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id} className="py-3">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={allColumns.length} className="h-40 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <FileText className="h-8 w-8 text-muted-foreground" />
+                        <p className="text-muted-foreground text-sm">No invoices yet.</p>
+                        <Button
+                          size="sm"
+                          onClick={() => setShowCreateForm(true)}
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                        >
+                          <Plus className="h-4 w-4 mr-1" /> Create Invoice
+                        </Button>
+                      </div>
                     </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={allColumns.length} className="h-40 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <FileText className="h-8 w-8 text-muted-foreground" />
-                    <p className="text-muted-foreground text-sm">No invoices yet.</p>
-                    <Button size="sm" onClick={() => setShowCreateForm(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                      <Plus className="h-4 w-4 mr-1" /> Create Invoice
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-      <div className="flex items-center justify-end gap-2">
-        <span className="flex-1 text-sm text-muted-foreground">{table.getFilteredRowModel().rows.length} invoice{table.getFilteredRowModel().rows.length !== 1 ? "s" : ""}</span>
-        <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} className="bg-card border-border hover:bg-accent hover:text-foreground disabled:opacity-50">Previous</Button>
-        <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} className="bg-card border-border hover:bg-accent hover:text-foreground disabled:opacity-50">Next</Button>
-      </div>
+          <div className="flex items-center justify-end gap-2">
+            <span className="flex-1 text-sm text-muted-foreground">
+              {table.getFilteredRowModel().rows.length} invoice{table.getFilteredRowModel().rows.length !== 1 ? "s" : ""}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="bg-card border-border hover:bg-accent hover:text-foreground disabled:opacity-50"
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="bg-card border-border hover:bg-accent hover:text-foreground disabled:opacity-50"
+            >
+              Next
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

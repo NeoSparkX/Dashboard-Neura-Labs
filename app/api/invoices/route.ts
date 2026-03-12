@@ -30,7 +30,12 @@ function normalizeStatus(value: unknown): "Draft" | "Pending" | "Paid" | "Overdu
 async function enrichInvoice(doc: Record<string, unknown>) {
   if (doc.client_id && !doc.client_name) {
     const client = await getDoc("clients", doc.client_id as string);
-    if (client) doc.client_name = client.company_name;
+    if (client) {
+      doc.client_name = client.company_name;
+      doc.client_email = client.email;
+      doc.client_phone = client.phone;
+      doc.client_address = [client.country].filter(Boolean).join(", ");
+    }
   }
   return { ...doc, clients: doc.client_name ? { company_name: doc.client_name } : null };
 }
@@ -90,6 +95,7 @@ export async function POST(req: Request) {
     due_date,
     currency: normalizeText(body?.currency) ?? "USD",
     status: normalizeStatus(body?.status),
+    pdf_url: normalizeText(body?.pdf_url) ?? null,
   };
 
   const project_id = normalizeText(body?.project_id);
@@ -131,6 +137,7 @@ export async function PATCH(req: Request) {
   if (body?.amount !== undefined) updates.amount = normalizeNumber(body.amount);
   if (body?.due_date !== undefined) updates.due_date = normalizeDate(body.due_date);
   if (body?.notes !== undefined) updates.notes = normalizeText(body.notes);
+  if (body?.pdf_url !== undefined) updates.pdf_url = normalizeText(body.pdf_url);
 
   if (!Object.keys(updates).length)
     return NextResponse.json({ error: "No fields provided" }, { status: 400 });

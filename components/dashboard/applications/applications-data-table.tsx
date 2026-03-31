@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -51,10 +51,11 @@ export function ApplicationsDataTable({ initialData }: ApplicationsDataTableProp
     setData(initialData);
   }, [initialData]);
 
-  const filteredData =
-    activeTab === "all"
+  const filteredData = useMemo(() => {
+    return activeTab === "all"
       ? data
       : data.filter((app) => app.status === activeTab);
+  }, [data, activeTab]);
 
   const tabs: { value: StatusTab; label: string; count: number }[] = [
     { value: "all", label: "All", count: data.length },
@@ -63,24 +64,27 @@ export function ApplicationsDataTable({ initialData }: ApplicationsDataTableProp
     { value: "rejected", label: "Rejected", count: data.filter((a) => a.status === "rejected").length },
   ];
 
-  const columnsWithActions: ColumnDef<CampaignApplication>[] = [
-    ...applicationColumns,
-    {
-      id: "actions",
-      cell: ({ row }) => (
-        <Link href={`/dashboard/applications/${row.original.id}`}>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-[#6366f1] hover:text-primary hover:bg-[#6366f1]/10"
-          >
-            Review
-            <ExternalLink className="ml-1 h-3 w-3" />
-          </Button>
-        </Link>
-      ),
-    },
-  ];
+  const columnsWithActions = useMemo<ColumnDef<CampaignApplication>[]>(
+    () => [
+      ...applicationColumns,
+      {
+        id: "actions",
+        cell: ({ row }) => (
+          <Link href={`/dashboard/applications/${row.original.id}`}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-[#6366f1] hover:text-primary hover:bg-[#6366f1]/10"
+            >
+              Review
+              <ExternalLink className="ml-1 h-3 w-3" />
+            </Button>
+          </Link>
+        ),
+      },
+    ],
+    []
+  );
 
   const table = useReactTable({
     data: filteredData,

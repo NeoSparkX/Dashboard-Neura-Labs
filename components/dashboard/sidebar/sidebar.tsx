@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -16,6 +17,7 @@ import {
   Briefcase,
   Plug,
   Settings,
+  ClipboardList,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
@@ -38,6 +40,7 @@ type NavItem = {
   name: string;
   href: string;
   icon: LucideIcon;
+  badgeKey?: string;
 };
 
 type NavGroup = {
@@ -47,6 +50,12 @@ type NavGroup = {
 
 const overviewItem: NavItem = { name: "Overview", href: "/dashboard", icon: LayoutDashboard };
 const navigationGroups: NavGroup[] = [
+  {
+    name: "Campaign",
+    items: [
+      { name: "Applications", href: "/dashboard/applications", icon: ClipboardList, badgeKey: "pendingApplications" },
+    ],
+  },
   {
     name: "Workspace",
     items: [
@@ -80,20 +89,25 @@ const navigationGroups: NavGroup[] = [
 /*  Icon rail item with tooltip                                       */
 /* ------------------------------------------------------------------ */
 
-function IconRailItem({ item, isActive }: { item: NavItem; isActive: boolean }) {
+function IconRailItem({ item, isActive, badgeCount }: { item: NavItem; isActive: boolean; badgeCount?: number }) {
   return (
     <Tooltip delayDuration={0}>
       <TooltipTrigger asChild>
         <Link
           href={item.href}
           className={cn(
-            "flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200",
+            "relative flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200",
             isActive
               ? "bg-primary/15 text-primary shadow-sm"
               : "text-muted-foreground hover:bg-accent hover:text-foreground"
           )}
         >
           <item.icon className="h-4 w-4" />
+          {(badgeCount ?? 0) > 0 && (
+            <span className="absolute -top-1 -right-1 text-[10px] font-bold bg-primary text-primary-foreground rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+              {badgeCount}
+            </span>
+          )}
         </Link>
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={12} className="text-xs font-medium">
@@ -109,6 +123,29 @@ function IconRailItem({ item, isActive }: { item: NavItem; isActive: boolean }) 
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [badgeCounts, setBadgeCounts] = useState<Record<string, number>>({});
+
+  // Fetch pending application count for the badge
+  useEffect(() => {
+    async function fetchPendingCount() {
+      try {
+        const res = await fetch("/api/campaign-applications?status=pending");
+        if (res.ok) {
+          const data = await res.json();
+          setBadgeCounts((prev) => ({
+            ...prev,
+            pendingApplications: data.applications?.length ?? 0,
+          }));
+        }
+      } catch {
+        // Silently fail — badge just won't show
+      }
+    }
+    fetchPendingCount();
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchPendingCount, 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <TooltipProvider>
@@ -128,7 +165,12 @@ export function Sidebar() {
               {group.items.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                 return (
-                  <IconRailItem key={item.name} item={item} isActive={isActive} />
+                  <IconRailItem
+                    key={item.name}
+                    item={item}
+                    isActive={isActive}
+                    badgeCount={item.badgeKey ? badgeCounts[item.badgeKey] : undefined}
+                  />
                 );
               })}
             </div>
@@ -136,6 +178,37 @@ export function Sidebar() {
         </div>
       </div>
     </TooltipProvider>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Pending badge for mobile sidebar                                   */
+/* ------------------------------------------------------------------ */
+
+function PendingBadgeMobile() {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    async function fetchCount() {
+      try {
+        const res = await fetch("/api/campaign-applications?status=pending");
+        if (res.ok) {
+          const data = await res.json();
+          setCount(data.applications?.length ?? 0);
+        }
+      } catch {
+        // Silently fail
+      }
+    }
+    fetchCount();
+  }, []);
+
+  if (count === 0) return null;
+
+  return (
+    <span className="ml-auto text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">
+      {count}
+    </span>
   );
 }
 
@@ -202,6 +275,9 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                         )}
                       />
                       {item.name}
+                      {item.badgeKey === "pendingApplications" && (
+                        <PendingBadgeMobile />
+                      )}
                     </Link>
                   );
                 })}
